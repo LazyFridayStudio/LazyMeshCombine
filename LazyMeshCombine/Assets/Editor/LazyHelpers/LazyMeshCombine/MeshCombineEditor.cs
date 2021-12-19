@@ -1,9 +1,7 @@
 #region NameSpaces
 
-using System;
 using UnityEngine;
 using UnityEditor;
-using System.Linq;
 
 #endregion
 
@@ -28,64 +26,91 @@ public class MeshCombineEditor : Editor
 {
     private MeshCombine targetMeshCombine;
 
-    #region Constances
+    #region Constants
+    
     private readonly Color32 headerColorText = new Color32(218, 124, 40, 255);
     private readonly Color32 headerColor = new Color32(26, 26, 26, 255);
     private readonly Color32 headerSeparatorColor = new Color32(242, 242, 242, 255);
     private readonly Color32 itemAreaColor = new Color32(22, 22, 22, 255);
     
     #endregion
-    
-    #region Textures
-    
-    private Texture2D headerBackground;
-    private Texture2D headerSeparatorBackground;
-    private Texture2D itemAreaBackground;
-    
-    #endregion
-    
+
     #region Styles
+    
     public GUIStyle headerStyleText = new GUIStyle();
     public GUIStyle subMenuStyleText = new GUIStyle();
+    
     #endregion
 
     #region Propertys
-
-    public SerializedProperty MeshFilters;
-    public SerializedProperty combinedInstance;
-    public SerializedProperty combinedInstanceMaterial;
     
+    private SerializedProperty MeshFilters;
+    
+    // Generation
+    private SerializedProperty generationMethod;
+    private SerializedProperty generationTime;
+
+    // Cleanup
+    private SerializedProperty cleanupMethod;
+    
+    // Combine Settings
+    private SerializedProperty combineSetting;
+    private SerializedProperty combinedInstance;
+    private SerializedProperty combineMaterialSetting;
+    private SerializedProperty combinedInstanceMaterial;
+    
+    // UV Generation
+    private SerializedProperty generateSecondaryUvs;
+
     #endregion
 
-    private void InitStyleAndTextures()
+    #region Setups
+
+    private void InitStyles()
     {
         // Setup header font
-        string path = "Assets/Editor/LazyHelpers/Resources/HeaderFont.ttf";
-        Font headerFont = EditorGUIUtility.Load(path) as Font;
         headerStyleText.normal.textColor = headerColorText;
         headerStyleText.fontSize = 16;
         headerStyleText.alignment = TextAnchor.LowerCenter;
-        headerStyleText.font = headerFont;
-        
+        headerStyleText.fontStyle = FontStyle.Bold;
+
         // Setup header font
         subMenuStyleText.normal.textColor = headerColorText;
-        subMenuStyleText.fontSize = 14;
+        subMenuStyleText.fontSize = 12;
+        subMenuStyleText.fontStyle = FontStyle.Bold;
         subMenuStyleText.alignment = TextAnchor.MiddleCenter;
     }
 
-    private void InitPropertys()
+    /// <summary>
+    /// Setup the properties for the inspector
+    /// </summary>
+    private void InitProperties()
     {
-        MeshFilters = serializedObject.FindProperty ("MeshFilters");
-        combinedInstance = serializedObject.FindProperty ("CombinedInstance");
-        combinedInstanceMaterial = serializedObject.FindProperty ("CombinedInstanceMaterial");
+        MeshFilters = serializedObject.FindProperty("meshFilters");
+
+        // Combine Settings
+        combinedInstance = serializedObject.FindProperty("combinedInstance");
+        combinedInstanceMaterial = serializedObject.FindProperty("combinedInstanceMaterial");
+        combineSetting = serializedObject.FindProperty("combineSetting");
+        combineMaterialSetting = serializedObject.FindProperty("combineMaterialSetting");
+
+        // Generation
+        generationMethod = serializedObject.FindProperty("generationMethod");
+        generationTime = serializedObject.FindProperty("generationTime");
+
+        // Cleanup
+        cleanupMethod = serializedObject.FindProperty("cleanupMethod");
+
+        // UV Generation
+        generateSecondaryUvs = serializedObject.FindProperty("generateSecondaryUvs");
     }
     
-    #region Inspector Drawing Methods
+    #endregion
     
     private void OnEnable()
     {
-        InitStyleAndTextures();
-        InitPropertys();
+        InitStyles();
+        InitProperties();
     }
 
     public override void OnInspectorGUI()
@@ -105,7 +130,29 @@ public class MeshCombineEditor : Editor
         EditorGUILayout.Space(4);
         GUILayout.Label("LAZY MESH COMBINE", headerStyleText);
         EditorGUILayout.EndVertical();
-
+        
+        // Draw Separator
+        EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+        EditorGUILayout.BeginVertical();
+        GUILayout.Label("Core", subMenuStyleText);
+        EditorGUILayout.EndVertical();
+        
+        // Draw Warnings
+        EditorGUILayout.BeginHorizontal(GUI.skin.box);
+        string HelpBoxText = "Thank you for using Lazy Mesh Combine";
+        MessageType messageType = MessageType.None;
+        if (CountVerticesInMeshes(targetMeshCombine.GetMeshFilters.ToArray()) > 65535)
+        {
+            HelpBoxText = "The Combined Mesh will be greater then 65535, This will cause errors in the combining";
+            messageType = MessageType.Error;
+        }
+        EditorGUILayout.HelpBox(HelpBoxText, messageType, true);
+        EditorGUILayout.EndHorizontal();
+        
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.PropertyField(MeshFilters,new GUIContent("Meshes"));
+        EditorGUILayout.EndHorizontal();
+        
         // Draw Stats SubHeading
         EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
         EditorGUILayout.BeginVertical();
@@ -113,59 +160,70 @@ public class MeshCombineEditor : Editor
         EditorGUILayout.EndVertical();
         
         // Draw Stats
-        EditorGUILayout.BeginVertical();
-        EditorGUILayout.HelpBox("Mesh Count: ", MessageType.None, true);
-        EditorGUILayout.HelpBox("Vertices Count: ", MessageType.None, true);
+        EditorGUILayout.BeginVertical(GUI.skin.box);
+        EditorGUILayout.LabelField("Mesh Count: " + CountMeshes(targetMeshCombine.GetMeshFilters.ToArray()));
+        EditorGUILayout.LabelField("Vertices Count: " + CountVerticesInMeshes(targetMeshCombine.GetMeshFilters.ToArray()));
         EditorGUILayout.EndVertical();
         
-        
-        // Draw Separator
+        // Draw Settings
         EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
         EditorGUILayout.BeginVertical();
-        GUILayout.Label("Propertys", subMenuStyleText);
+        GUILayout.Label("Settings", subMenuStyleText);
         EditorGUILayout.EndVertical();
+        EditorGUILayout.BeginVertical(GUI.skin.box);
         
-        // Draw Value Area
-        EditorGUILayout.BeginVertical();
-        EditorGUILayout.Space(4);
-
+        // Which type of generation
         EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Mesh Filters", GUILayout.MaxWidth(150), GUILayout.MinWidth(150));
-        EditorGUILayout.PropertyField(MeshFilters);
+        EditorGUILayout.PropertyField(generationMethod);
         EditorGUILayout.EndHorizontal();
         
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Combined Instance", GUILayout.MaxWidth(150), GUILayout.MinWidth(150));
-        EditorGUILayout.PropertyField(combinedInstance);
-        EditorGUILayout.EndHorizontal();
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Combined Instance Material", GUILayout.MaxWidth(150), GUILayout.MinWidth(150));
-        EditorGUILayout.PropertyField(combinedInstanceMaterial);
-        EditorGUILayout.EndHorizontal();
-        
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Unwrap Secondary UVs", GUILayout.MaxWidth(150), GUILayout.MinWidth(150));
-       // targetMeshCombine.unwrappedState = (MeshCombine.eState)EditorGUILayout.EnumPopup(targetMeshCombine.unwrappedState);
-        EditorGUILayout.EndHorizontal();
-        
-        EditorGUILayout.BeginHorizontal();
-        
-        string HelpBoxText = String.Empty;
-        MessageType messageType = MessageType.None;
-        if (CountVerticesInMeshes(targetMeshCombine.MeshFilters.ToArray()) > 65535)
+        if (generationMethod.enumValueIndex != (int) MeshCombine.eGenerationMethod.None)
         {
-            HelpBoxText = "The Combined Mesh will be greater then 65535, This will cause errors in the combining";
-            messageType = MessageType.Error;
+            if (generationMethod.enumValueIndex == (int) MeshCombine.eGenerationMethod.GenerateAfterTimeAwake ||
+                generationMethod.enumValueIndex == (int) MeshCombine.eGenerationMethod.GenerateAfterTimeStart)
+            {
+                EditorGUILayout.PropertyField(generationTime);
+            }
+
+            EditorGUILayout.BeginVertical();
+            EditorGUILayout.PropertyField(cleanupMethod);
+
+            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            EditorGUILayout.PropertyField(combineSetting);
+            if (combineSetting.enumValueIndex == (int) MeshCombine.eCombineSetting.CombineToObject)
+            {
+                EditorGUILayout.PropertyField(combinedInstance);
+            }
+
+            EditorGUILayout.PropertyField(combineMaterialSetting);
+            if (combineMaterialSetting.enumValueIndex == (int) MeshCombine.eCombineMaterialSetting.SharedMaterial)
+            {
+                EditorGUILayout.PropertyField(combinedInstanceMaterial);
+            }
+            EditorGUILayout.EndVertical();
+            
+            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            EditorGUILayout.HelpBox("This will only work if generation is done in editor", MessageType.Warning, true);
+            EditorGUILayout.PropertyField(generateSecondaryUvs);
         }
-        
-        EditorGUILayout.HelpBox(HelpBoxText, messageType, true);
-        EditorGUILayout.EndHorizontal();
-        
-        EditorGUILayout.Space(200);
         EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(100);
+        
+        if (generationMethod.enumValueIndex == (int) MeshCombine.eGenerationMethod.GenerateByButton)
+        {
+            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            if (GUILayout.Button("Generate Combined mesh"))
+            {
+                targetMeshCombine.CombineMeshes();
+            }
+        }
     }
-    #endregion
+    
+    #region Helper Methods
+
+    private int CountMeshes(MeshFilter[] meshFilters)
+    {
+        return meshFilters.Length;
+    }
     
     private static int CountVerticesInMeshes(MeshFilter[] meshFilters)
     {
@@ -177,10 +235,12 @@ public class MeshCombineEditor : Editor
         {
             if (mf != null)
             {
-                verticesCount += mf.sharedMesh.vertexCount; 
+                verticesCount += mf.sharedMesh.vertexCount;
             }
         }
 
         return verticesCount;
     }
+   
+    #endregion
 }
