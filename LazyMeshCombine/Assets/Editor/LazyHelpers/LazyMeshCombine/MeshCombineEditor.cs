@@ -61,6 +61,11 @@ public class MeshCombineEditor : Editor
     
     // UV Generation
     private SerializedProperty generateSecondaryUvs;
+    
+    // combine Settings
+    private SerializedProperty mergeSubMeshes;
+    private SerializedProperty useMatrices;
+    private SerializedProperty hasLightMapData;
 
     #endregion
 
@@ -103,6 +108,11 @@ public class MeshCombineEditor : Editor
 
         // UV Generation
         generateSecondaryUvs = serializedObject.FindProperty("generateSecondaryUvs");
+        
+    // combine Settings
+    mergeSubMeshes = serializedObject.FindProperty("mergeSubMeshes");
+    useMatrices = serializedObject.FindProperty("useMatrices");
+    hasLightMapData = serializedObject.FindProperty("hasLightMapData");
     }
     
     #endregion
@@ -202,6 +212,13 @@ public class MeshCombineEditor : Editor
             }
             EditorGUILayout.EndVertical();
             
+            // Combining Settings
+            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            EditorGUILayout.PropertyField(mergeSubMeshes);
+            EditorGUILayout.PropertyField(useMatrices);
+            EditorGUILayout.PropertyField(hasLightMapData);
+            
+            // Uv Unwrapping
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
             EditorGUILayout.HelpBox("This will only work if generation is done in editor", MessageType.Warning, true);
             EditorGUILayout.PropertyField(generateSecondaryUvs);

@@ -58,6 +58,11 @@ public class MeshCombine : MonoBehaviour
     // Uv Unwrapping
     [SerializeField] private bool generateSecondaryUvs;
 
+    // Mesh combining settings
+    [SerializeField] private bool mergeSubMeshes;
+    [SerializeField] private bool useMatrices;
+    [SerializeField] private bool hasLightMapData;
+    
     [SerializeField] private List<MeshFilter> meshFilters;
     public List<MeshFilter> GetMeshFilters => meshFilters;
 
@@ -133,7 +138,7 @@ public class MeshCombine : MonoBehaviour
 
         // Combine Meshes
         CIMF.mesh = new Mesh();
-        CIMF.sharedMesh.CombineMeshes(combine);
+        CIMF.sharedMesh.CombineMeshes(combine, mergeSubMeshes, useMatrices, hasLightMapData);
 
         switch (combineMaterialSetting)
         {
