@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -8,6 +9,21 @@ public class MeshCombine : MonoBehaviour
 {
     #region Enums
 
+    public enum ePopulatingMethod
+    {
+        Manual,
+        PopulateFromChildren,
+        PopulateFromObjectChildren,
+    }
+    
+    public enum ePopulatingTime
+    {
+        None,
+        OnCombine,
+        OnAwake,
+        OnStart,
+    }
+    
     public enum eGenerationMethod
     {
         None,
@@ -63,11 +79,25 @@ public class MeshCombine : MonoBehaviour
     [SerializeField] private bool useMatrices;
     [SerializeField] private bool hasLightMapData;
     
+    // Populating Method
     [SerializeField] private List<MeshFilter> meshFilters;
-    public List<MeshFilter> GetMeshFilters => meshFilters;
+    [SerializeField] private ePopulatingMethod populatingMethod;
+    [SerializeField] private ePopulatingTime populatingTime;
+    [SerializeField] private GameObject populatingObject;
+    
+    public List<MeshFilter> MeshFilters
+    {
+        get => meshFilters;
+        set => meshFilters = value;
+    }
 
     private void Awake()
     {
+        if (populatingTime == ePopulatingTime.OnAwake)
+        {
+            populateMeshes();
+        }
+        
         if (generationMethod == eGenerationMethod.GenerateOnAwake)
         {
             CombineMeshes();
@@ -80,6 +110,11 @@ public class MeshCombine : MonoBehaviour
 
     private void Start()
     {
+        if (populatingTime == ePopulatingTime.OnStart)
+        {
+            populateMeshes();
+        }
+        
         if (generationMethod == eGenerationMethod.GenerateOnStart)
         {
             CombineMeshes();
@@ -90,14 +125,50 @@ public class MeshCombine : MonoBehaviour
         }
     }
 
+    private void populateMeshes()
+    {
+        switch (populatingMethod)
+        {
+            case ePopulatingMethod.PopulateFromChildren:
+                meshFilters = GetComponentsInChildren<MeshFilter>().ToList();
+                break;
+            case ePopulatingMethod.PopulateFromObjectChildren:
+                meshFilters = populatingObject.GetComponentsInChildren<MeshFilter>().ToList();
+                break;
+        }
+    }
+
     private async Task GenerateAfterTime()
     {
         await Task.Delay(TimeSpan.FromSeconds(generationTime));
         CombineMeshes();
     }
 
+    public void CombineMeshes(List<MeshFilter> _meshFilters, eCleanupMethod _cleanupMethod)
+    {
+        cleanupMethod = _cleanupMethod;
+        MeshFilters = _meshFilters;
+
+        generationMethod = eGenerationMethod.None;
+        combineSetting = eCombineSetting.CombineToNewObject;
+        combineMaterialSetting = eCombineMaterialSetting.FirstMeshMaterial;
+        generateSecondaryUvs = false;
+        mergeSubMeshes = true;
+        useMatrices = true;
+        hasLightMapData = false;
+        populatingMethod = ePopulatingMethod.Manual;
+        populatingTime = ePopulatingTime.None;
+        
+        CombineMeshes();
+    }
+    
     public void CombineMeshes()
     {
+        if (populatingTime == ePopulatingTime.OnCombine)
+        {
+            populateMeshes();
+        }
+        
         // Combine lists
         CombineInstance[] combine = new CombineInstance[meshFilters.Count];
 

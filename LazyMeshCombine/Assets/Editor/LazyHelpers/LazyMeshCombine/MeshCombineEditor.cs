@@ -44,6 +44,10 @@ public class MeshCombineEditor : Editor
 
     #region Propertys
     
+    // Populating Method
+    private SerializedProperty populatingMethod;
+    private SerializedProperty populatingTime;
+    private SerializedProperty populatingObject;
     private SerializedProperty MeshFilters;
     
     // Generation
@@ -66,7 +70,10 @@ public class MeshCombineEditor : Editor
     private SerializedProperty mergeSubMeshes;
     private SerializedProperty useMatrices;
     private SerializedProperty hasLightMapData;
+    
 
+    
+    
     #endregion
 
     #region Setups
@@ -91,6 +98,9 @@ public class MeshCombineEditor : Editor
     /// </summary>
     private void InitProperties()
     {
+        populatingMethod = serializedObject.FindProperty("populatingMethod");
+        populatingTime = serializedObject.FindProperty("populatingTime");
+        populatingObject = serializedObject.FindProperty("populatingObject");
         MeshFilters = serializedObject.FindProperty("meshFilters");
 
         // Combine Settings
@@ -151,7 +161,7 @@ public class MeshCombineEditor : Editor
         EditorGUILayout.BeginHorizontal(GUI.skin.box);
         string HelpBoxText = "Thank you for using Lazy Mesh Combine";
         MessageType messageType = MessageType.None;
-        if (CountVerticesInMeshes(targetMeshCombine.GetMeshFilters.ToArray()) > 65535)
+        if (CountVerticesInMeshes(targetMeshCombine.MeshFilters.ToArray()) > 65535)
         {
             HelpBoxText = "The Combined Mesh will be greater then 65535, This will cause errors in the combining";
             messageType = MessageType.Error;
@@ -159,9 +169,22 @@ public class MeshCombineEditor : Editor
         EditorGUILayout.HelpBox(HelpBoxText, messageType, true);
         EditorGUILayout.EndHorizontal();
         
-        EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.PropertyField(MeshFilters,new GUIContent("Meshes"));
-        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.BeginVertical(GUI.skin.box);
+        EditorGUILayout.PropertyField(populatingMethod);
+        if (populatingMethod.enumValueIndex == (int) MeshCombine.ePopulatingMethod.PopulateFromObjectChildren)
+        {
+            EditorGUILayout.PropertyField(populatingObject);
+        }
+        EditorGUILayout.PropertyField(populatingTime);
+        EditorGUILayout.EndVertical();
+
+        if (populatingMethod.enumValueIndex == (int) MeshCombine.ePopulatingMethod.Manual)
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.PropertyField(MeshFilters,new GUIContent("Meshes"));
+            EditorGUILayout.EndHorizontal();
+        }
+
         
         // Draw Stats SubHeading
         EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
@@ -171,8 +194,8 @@ public class MeshCombineEditor : Editor
         
         // Draw Stats
         EditorGUILayout.BeginVertical(GUI.skin.box);
-        EditorGUILayout.LabelField("Mesh Count: " + CountMeshes(targetMeshCombine.GetMeshFilters.ToArray()));
-        EditorGUILayout.LabelField("Vertices Count: " + CountVerticesInMeshes(targetMeshCombine.GetMeshFilters.ToArray()));
+        EditorGUILayout.LabelField("Mesh Count: " + CountMeshes(targetMeshCombine.MeshFilters.ToArray()));
+        EditorGUILayout.LabelField("Vertices Count: " + CountVerticesInMeshes(targetMeshCombine.MeshFilters.ToArray()));
         EditorGUILayout.EndVertical();
         
         // Draw Settings
@@ -218,10 +241,18 @@ public class MeshCombineEditor : Editor
             EditorGUILayout.PropertyField(useMatrices);
             EditorGUILayout.PropertyField(hasLightMapData);
             
-            // Uv Unwrapping
-            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
-            EditorGUILayout.HelpBox("This will only work if generation is done in editor", MessageType.Warning, true);
-            EditorGUILayout.PropertyField(generateSecondaryUvs);
+            if (generationMethod.enumValueIndex == (int)MeshCombine.eGenerationMethod.GenerateByButton)
+            {
+                // Uv Unwrapping
+                EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+                EditorGUILayout.HelpBox("This will only work if generation is done in editor", MessageType.Warning, true);
+                EditorGUILayout.PropertyField(generateSecondaryUvs);
+            }
+            else
+            {
+                generateSecondaryUvs.boolValue = false;
+            }
+
         }
         EditorGUILayout.EndVertical();
         
